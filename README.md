@@ -94,6 +94,25 @@ Data Collection → Feature Engineering → Preprocessing → Model Training →
 
 ---
 
+## Database Schema
+
+A SQLite database (`data/loan_predictions.db`) stores all predictions for historical analysis and SQL-based reporting.
+
+| Table | Purpose |
+|-------|----------|
+| `applicants` | Stores applicant demographic profiles (gender, education, property area) |
+| `loan_applications` | Stores loan details, prediction outcomes, risk levels, and derived metrics |
+| `model_runs` | Stores model training metadata and evaluation metrics |
+
+### Key SQL Reports Available
+- **Approval statistics** — Total applications, approval/rejection counts, average probability
+- **Property area analysis** — Approval rates grouped by Urban/Semiurban/Rural
+- **Education analysis** — Approval rates by Graduate/Not Graduate
+- **Risk distribution** — Application counts by Low/Medium/High risk
+- **Prediction history** — Full audit trail of all predictions with timestamps
+
+---
+
 ## Setup & Usage
 
 ### Prerequisites
@@ -159,7 +178,8 @@ Loan Prediction/
 │   ├── model_training.py       # Training with CV + tuning
 │   ├── evaluation.py           # Metrics + diagnostic plots
 │   ├── explainability.py       # SHAP analysis
-│   └── predict.py              # Inference module
+│   ├── predict.py              # Inference module
+│   └── database.py             # SQLite database layer
 │
 ├── models/
 │   ├── best_model.joblib       # Saved best model
@@ -198,6 +218,7 @@ Loan Prediction/
 | **ML** | Scikit-Learn, XGBoost |
 | **Visualization** | Matplotlib, Seaborn |
 | **Explainability** | SHAP |
+| **Database** | SQLite |
 | **Deployment** | Streamlit |
 | **Serialization** | Joblib |
 

@@ -15,6 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_PATH = BASE_DIR / "data" / "loan_data.csv"
 MODEL_DIR = BASE_DIR / "models"
 OUTPUT_DIR = BASE_DIR / "outputs"
+DB_PATH = BASE_DIR / "data" / "loan_predictions.db"
 
 # Create directories if they don't exist
 MODEL_DIR.mkdir(parents=True, exist_ok=True)

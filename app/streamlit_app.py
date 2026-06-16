@@ -17,6 +17,14 @@ import pandas as pd
 import numpy as np
 import joblib
 import matplotlib.pyplot as plt
+import sys
+
+# Add project root to path for imports
+BASE_DIR_INIT = Path(__file__).resolve().parent.parent
+if str(BASE_DIR_INIT) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR_INIT))
+
+from src.database import LoanDatabase
 
 # ── Page config ─────────────────────────────
 st.set_page_config(
@@ -242,7 +250,7 @@ def main():
         predict_btn = st.button("🔍 Predict Approval", use_container_width=True, type="primary")
 
     # ── Tabs ────────────────────────────────
-    tab1, tab2, tab3 = st.tabs(["🔮 Prediction", "📊 Model Performance", "ℹ️ About"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🔮 Prediction", "📊 Model Performance", "📁 History & Reports", "ℹ️ About"])
 
     with tab1:
         if predict_btn:
@@ -262,6 +270,16 @@ def main():
 
             with st.spinner("Analyzing application..."):
                 result = predict_loan(input_data, model, artifacts)
+
+            # Save prediction to SQLite database
+            try:
+                db = LoanDatabase()
+                app_id = db.save_prediction(
+                    input_data, result["prediction"], result["probability"]
+                )
+                st.toast(f"✅ Application #{app_id} saved to database", icon="💾")
+            except Exception as e:
+                st.toast(f"⚠️ Could not save to database: {e}", icon="⚠️")
 
             # Prediction Result
             is_approved = result["prediction"] == "Approved"
@@ -396,6 +414,102 @@ def main():
             st.image(str(shap_path))
 
     with tab3:
+        st.markdown('<div class="section-header">📁 Prediction History & SQL Reports</div>',
+                    unsafe_allow_html=True)
+
+        try:
+            db = LoanDatabase()
+            total = db.get_total_count()
+
+            if total == 0:
+                st.info("No predictions yet. Use the **Prediction** tab to make your first prediction — it will be saved automatically.")
+            else:
+                # ── Summary Metrics ──────────────────
+                stats = db.get_approval_stats()
+                m1, m2, m3, m4 = st.columns(4)
+                with m1:
+                    st.metric("Total Applications", stats["total_applications"])
+                with m2:
+                    st.metric("Approved", stats["approved_count"])
+                with m3:
+                    st.metric("Rejected", stats["rejected_count"])
+                with m4:
+                    st.metric("Avg Approval Prob", f"{stats['avg_approval_prob']}%")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                # ── Charts Row ───────────────────────
+                chart_col1, chart_col2 = st.columns(2)
+
+                with chart_col1:
+                    st.markdown('<div class="section-header">Approval by Property Area</div>',
+                                unsafe_allow_html=True)
+                    area_stats = db.get_stats_by_property_area()
+                    if area_stats:
+                        area_df = pd.DataFrame(area_stats)
+                        st.dataframe(area_df.rename(columns={
+                            "property_area": "Area",
+                            "total": "Total",
+                            "approved": "Approved",
+                            "approval_rate": "Approval Rate (%)",
+                            "avg_loan": "Avg Loan (₹K)"
+                        }), use_container_width=True, hide_index=True)
+
+                with chart_col2:
+                    st.markdown('<div class="section-header">Approval by Education</div>',
+                                unsafe_allow_html=True)
+                    edu_stats = db.get_stats_by_education()
+                    if edu_stats:
+                        edu_df = pd.DataFrame(edu_stats)
+                        st.dataframe(edu_df.rename(columns={
+                            "education": "Education",
+                            "total": "Total",
+                            "approved": "Approved",
+                            "approval_rate": "Approval Rate (%)"
+                        }), use_container_width=True, hide_index=True)
+
+                # ── Risk Distribution ────────────────
+                st.markdown('<div class="section-header">Risk Distribution</div>',
+                            unsafe_allow_html=True)
+                risk_stats = db.get_risk_distribution()
+                if risk_stats:
+                    risk_df = pd.DataFrame(risk_stats)
+                    st.dataframe(risk_df.rename(columns={
+                        "risk_level": "Risk Level",
+                        "count": "Count",
+                        "avg_probability": "Avg Probability (%)"
+                    }), use_container_width=True, hide_index=True)
+
+                # ── Full History Table ───────────────
+                st.markdown('<div class="section-header">Recent Predictions</div>',
+                            unsafe_allow_html=True)
+                history = db.get_prediction_history(limit=50)
+                if history:
+                    hist_df = pd.DataFrame(history)
+                    display_cols = {
+                        "application_id": "#",
+                        "gender": "Gender",
+                        "education": "Education",
+                        "property_area": "Area",
+                        "applicant_income": "Income (₹)",
+                        "loan_amount": "Loan (₹K)",
+                        "credit_history": "Credit",
+                        "prediction": "Result",
+                        "approval_probability": "Probability",
+                        "risk_level": "Risk",
+                        "created_at": "Date",
+                    }
+                    cols_available = [c for c in display_cols if c in hist_df.columns]
+                    st.dataframe(
+                        hist_df[cols_available].rename(columns=display_cols),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+        except Exception as e:
+            st.error(f"Database error: {e}")
+
+    with tab4:
         st.markdown("""
         ### About This Project
 
@@ -410,6 +524,7 @@ def main():
         4. **Model Training** — Train 4 models with cross-validation and hyperparameter tuning
         5. **Evaluation** — Compare models on accuracy, precision, recall, F1, ROC-AUC
         6. **Explainability** — SHAP analysis for model transparency
+        7. **Database** — SQLite storage for historical analysis and SQL-based reporting
 
         #### Models Trained
         - Logistic Regression (baseline)
@@ -418,7 +533,7 @@ def main():
         - XGBoost Classifier (tuned)
 
         #### Tech Stack
-        `Python` · `Scikit-Learn` · `XGBoost` · `SHAP` · `Pandas` · `Streamlit`
+        `Python` · `Scikit-Learn` · `XGBoost` · `SHAP` · `Pandas` · `Streamlit` · `SQLite`
 
         ---
         *Built as an internship project demonstrating end-to-end ML engineering.*
